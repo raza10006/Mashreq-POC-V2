@@ -241,14 +241,45 @@ module.exports = async (req, res) => {
                       body.call?.type || body.call?.direction || 'UNKNOWN';
     
     // Phone number - try many possible locations (use let so we can update it)
-    let phone_number = body.phone_number || body.phoneNumber || body.to || body.customer_phone || 
-                       body.from || body.caller || body.callee ||
-                       body.metadata?.phone_number || body.metadata?.to || body.metadata?.from ||
-                       body.data?.phone_number || body.data?.to || body.data?.from ||
-                       body.call?.to || body.call?.from || body.call?.phone_number ||
-                       body.customer?.phone || body.customer?.phone_number ||
-                       body.conversation_initiation_client_data?.dynamic_variables?.customer_phone ||
-                       '';
+    // For OUTBOUND calls: customer is "to", agent is "from"
+    // For INBOUND calls: customer is "from", agent is "to"
+    // Prioritize "to" for outbound, exclude the Twilio number
+    const twilioNumber = process.env.TWILIO_FROM_NUMBER || '+15856678990';
+    
+    // Get all possible phone fields
+    const possiblePhones = [
+      body.to,
+      body.customer_phone,
+      body.phone_number,
+      body.phoneNumber,
+      body.callee,
+      body.metadata?.to,
+      body.metadata?.phone_number,
+      body.data?.to,
+      body.data?.phone_number,
+      body.call?.to,
+      body.call?.customer_phone,
+      body.customer?.phone,
+      body.customer?.phone_number,
+      body.conversation_initiation_client_data?.dynamic_variables?.customer_phone,
+      // Only use "from" as last resort (for inbound calls)
+      body.from,
+      body.caller,
+      body.metadata?.from,
+      body.data?.from,
+      body.call?.from,
+    ].filter(Boolean);
+    
+    // Find first phone that's NOT the Twilio number
+    let phone_number = possiblePhones.find(p => {
+      const normalized = p.replace(/\s/g, '');
+      const twilioNormalized = twilioNumber.replace(/\s/g, '');
+      return normalized !== twilioNormalized && !normalized.includes('158566');
+    }) || '';
+    
+    console.log('Possible phones found:', possiblePhones);
+    console.log('Twilio number to exclude:', twilioNumber);
+    console.log('Selected customer phone:', phone_number);
     
     const timestamp = body.timestamp || body.created_at || body.ended_at || 
                       body.metadata?.timestamp || body.call?.ended_at || new Date().toISOString();
