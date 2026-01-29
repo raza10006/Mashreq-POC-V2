@@ -30,6 +30,11 @@
       "dest": "/api/test-sms.js"
     },
     {
+      "src": "/api/webhook-debug",
+      "methods": ["GET", "POST", "OPTIONS"],
+      "dest": "/api/webhook-debug.js"
+    },
+    {
       "src": "/(.*)",
       "dest": "/public/$1"
     }

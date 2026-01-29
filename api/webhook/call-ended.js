@@ -226,15 +226,43 @@ module.exports = async (req, res) => {
   // Process asynchronously and log results
   
   try {
-    const { call_type, phone_number, transcript, timestamp } = req.body;
-    
+    // Log the ENTIRE payload to see what ElevenLabs sends
     console.log('='.repeat(60));
     console.log('WEBHOOK RECEIVED: Call Ended');
-    console.log(`Timestamp: ${timestamp}`);
-    console.log(`Call Type: ${call_type}`);
-    console.log(`Phone: ${phone_number}`);
-    console.log(`Transcript Length: ${transcript?.length || 0} chars`);
+    console.log('RAW PAYLOAD:', JSON.stringify(req.body, null, 2));
     console.log('='.repeat(60));
+    
+    // ElevenLabs may send data in different structures - try to extract
+    const body = req.body || {};
+    
+    // Try different possible field names
+    const call_type = body.call_type || body.callType || body.type || body.direction || 'UNKNOWN';
+    const phone_number = body.phone_number || body.phoneNumber || body.to || body.customer_phone || body.from || '';
+    const timestamp = body.timestamp || body.created_at || body.ended_at || new Date().toISOString();
+    
+    // Transcript might be in different locations
+    let transcript = '';
+    if (body.transcript) {
+      transcript = typeof body.transcript === 'string' ? body.transcript : JSON.stringify(body.transcript);
+    } else if (body.transcription) {
+      transcript = typeof body.transcription === 'string' ? body.transcription : JSON.stringify(body.transcription);
+    } else if (body.conversation) {
+      transcript = typeof body.conversation === 'string' ? body.conversation : JSON.stringify(body.conversation);
+    } else if (body.messages) {
+      // If messages is an array, concatenate all text
+      transcript = Array.isArray(body.messages) 
+        ? body.messages.map(m => m.text || m.content || m.message || '').join(' ')
+        : JSON.stringify(body.messages);
+    } else if (body.data?.transcript) {
+      transcript = body.data.transcript;
+    } else if (body.analysis?.transcript) {
+      transcript = body.analysis.transcript;
+    }
+    
+    console.log(`Extracted - Call Type: ${call_type}`);
+    console.log(`Extracted - Phone: ${phone_number}`);
+    console.log(`Extracted - Transcript Length: ${transcript?.length || 0} chars`);
+    console.log(`Extracted - Transcript Preview: ${transcript?.substring(0, 200) || 'EMPTY'}...`);
     
     // Validate required fields
     if (!phone_number || !transcript) {
