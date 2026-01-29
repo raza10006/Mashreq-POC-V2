@@ -3,7 +3,7 @@
  * POST /api/outbound-call
  */
 
-export default async function handler(req, res) {
+module.exports = async (req, res) => {
   // CORS headers
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -49,7 +49,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ 
         success: false, 
         error: 'Server configuration error', 
-        message: 'Missing environment variables. Please configure ELEVENLABS_API_KEY, ELEVENLABS_AGENT_ID, and ELEVENLABS_PHONE_NUMBER_ID.' 
+        message: 'Missing environment variables' 
       });
     }
 
@@ -74,36 +74,36 @@ export default async function handler(req, res) {
       : `Hello ${firstName}, this is Mashreq AI Assistant. I'm calling you today regarding ${callReason}.`;
 
     // Build conversation initiation data
-    const conversationInitiationClientData = {
-      dynamic_variables: {
-        customer_name: fullName,
-        customer_first_name: firstName,
-        preferred_language: preferredLanguage,
-        call_type: 'OUTBOUND',
-        call_reason: callReason,
-        outbound_context: JSON.stringify(outboundContext),
-        ...Object.entries(contextData || {}).reduce((acc, [key, value]) => {
-          acc[`context_${key}`] = typeof value === 'object' ? JSON.stringify(value) : String(value);
-          return acc;
-        }, {}),
-      },
-      conversation_config_override: {
-        agent: {
-          first_message: firstMessage,
-          language: isArabic ? 'ar' : 'en',
-        },
-      },
+    const dynamicVars = {
+      customer_name: fullName,
+      customer_first_name: firstName,
+      preferred_language: preferredLanguage,
+      call_type: 'OUTBOUND',
+      call_reason: callReason,
+      outbound_context: JSON.stringify(outboundContext),
     };
+
+    // Add context data as dynamic variables
+    if (contextData && typeof contextData === 'object') {
+      Object.entries(contextData).forEach(([key, value]) => {
+        dynamicVars[`context_${key}`] = typeof value === 'object' ? JSON.stringify(value) : String(value);
+      });
+    }
 
     const requestBody = {
       agent_id: process.env.ELEVENLABS_AGENT_ID,
       agent_phone_number_id: process.env.ELEVENLABS_PHONE_NUMBER_ID,
       to_number: phoneNumber,
-      conversation_initiation_client_data: conversationInitiationClientData,
+      conversation_initiation_client_data: {
+        dynamic_variables: dynamicVars,
+        conversation_config_override: {
+          agent: {
+            first_message: firstMessage,
+            language: isArabic ? 'ar' : 'en',
+          },
+        },
+      },
     };
-
-    console.log('Initiating call to:', phoneNumber);
-    console.log('Request body:', JSON.stringify(requestBody, null, 2));
 
     const response = await fetch('https://api.elevenlabs.io/v1/convai/twilio/outbound-call', {
       method: 'POST',
@@ -115,7 +115,6 @@ export default async function handler(req, res) {
     });
 
     const data = await response.json();
-    console.log('ElevenLabs response:', JSON.stringify(data, null, 2));
 
     if (!response.ok) {
       const errorMessage = data.detail?.message || data.detail || data.message || JSON.stringify(data);
@@ -139,11 +138,11 @@ export default async function handler(req, res) {
       },
     });
   } catch (error) {
-    console.error('Error initiating outbound call:', error);
+    console.error('Error:', error);
     return res.status(500).json({
       success: false,
       error: 'Failed to initiate outbound call',
       message: error.message,
     });
   }
-}
+};
