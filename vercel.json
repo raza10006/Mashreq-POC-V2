@@ -2,7 +2,7 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/*.js",
+      "src": "api/**/*.js",
       "use": "@vercel/node"
     },
     {
@@ -19,6 +19,11 @@
       "src": "/api/outbound-call",
       "methods": ["POST", "OPTIONS"],
       "dest": "/api/outbound-call.js"
+    },
+    {
+      "src": "/api/webhook/call-ended",
+      "methods": ["POST", "OPTIONS"],
+      "dest": "/api/webhook/call-ended.js"
     },
     {
       "src": "/(.*)",
