@@ -91,6 +91,14 @@ module.exports = async (req, res) => {
       });
     }
 
+    // Determine language code
+    let languageCode = 'en';
+    if (preferredLanguage.toLowerCase().includes('arabic')) {
+      languageCode = 'ar';
+    } else if (preferredLanguage.toLowerCase().includes('hindi')) {
+      languageCode = 'hi';
+    }
+
     const requestBody = {
       agent_id: process.env.ELEVENLABS_AGENT_ID,
       agent_phone_number_id: process.env.ELEVENLABS_PHONE_NUMBER_ID,
@@ -100,6 +108,7 @@ module.exports = async (req, res) => {
         conversation_config_override: {
           agent: {
             first_message: firstMessage,
+            language: languageCode,
           },
         },
       },
