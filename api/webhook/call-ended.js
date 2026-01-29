@@ -65,27 +65,75 @@ Thank you for using Mashreq Rewards.`,
 // ============================================================================
 
 // Keywords that TRIGGER SMS sending (in priority order)
+// IMPORTANT: These must detect REQUESTS to send SMS, not just mentions of topics
 const TRIGGER_KEYWORDS = {
-  // T&C requests - highest priority for specific document request
-  rewards_tnc: ['terms and conditions', 't&c', 'tnc', 'terms & conditions', 'send me the terms', 'send the terms', 'send terms', 't and c', 'terms conditions'],
+  // T&C requests - must be explicit request to SEND T&C
+  rewards_tnc: [
+    'send me the terms and conditions',
+    'send the terms and conditions',
+    'send me the t&c',
+    'send the t&c',
+    'send me the tnc',
+    'send the tnc',
+    'send t&c via sms',
+    'send tnc via sms',
+    'terms and conditions via sms',
+    't&c via sms',
+    'send me terms via sms',
+    'can you send the terms',
+    'can you send me the terms',
+    'send rules via sms',
+    'send the rules',
+  ],
   
-  // Transaction reference/SWIFT requests
-  transaction_reference: ['swift', 'reference number', 'transaction reference', 'send reference', 'swift copy', 'send the reference', 'transaction id', 'txn reference'],
+  // Transaction reference/SWIFT requests - explicit send request
+  transaction_reference: [
+    'send swift',
+    'send the swift',
+    'send me the swift',
+    'send reference number',
+    'send the reference number',
+    'send me the reference',
+    'send transaction reference',
+    'swift via sms',
+    'reference via sms',
+    'send me the transaction details',
+  ],
   
-  // Redemption related
-  redemption: ['redeem', 'redemption', 'redeem points', 'how to redeem', 'redemption rules', 'instant redemption'],
+  // Redemption rules request - explicit send request
+  redemption: [
+    'send redemption rules',
+    'send me the redemption',
+    'send redemption via sms',
+    'how to redeem via sms',
+    'redemption rules via sms',
+  ],
   
-  // Complaint/Case related
-  complaint: ['complaint', 'case', 'case reference', 'complaint status', 'case number', 'escalat', 'issue', 'problem', 'resolved', 'resolution'],
+  // Complaint/Case confirmation - when agent promises to send complaint confirmation
+  // This detects agent saying they will send SMS about complaint
+  complaint: [
+    'send you a confirmation with the case reference',
+    'send confirmation with case reference',
+    'case reference via sms',
+    'complaint reference via sms',
+    'send you the case reference',
+    'send case reference',
+    'initiated a complaint',
+    'raise a complaint',
+    'raised a complaint',
+    'complaint to investigate',
+    'i\'ve initiated a complaint',
+    'i have initiated a complaint',
+  ],
   
-  // Transaction/Transfer related
-  transaction: ['transaction', 'transfer', 'funds transfer', 'payment', 'beneficiary', 'not received', 'delay', 'pending'],
-  
-  // Rewards balance/points related
-  rewards: ['reward', 'points', 'points balance', 'earned points', 'loyalty', 'points earned'],
-  
-  // General summary request
-  summary: ['send summary', 'call summary', 'send confirmation', 'send details', 'email me', 'sms me'],
+  // General summary/confirmation request
+  summary: [
+    'send summary via sms',
+    'send me a summary',
+    'send confirmation via sms',
+    'send me confirmation',
+    'send details via sms',
+  ],
 };
 
 // Keywords that BLOCK SMS sending (failed verification, no resolution)
@@ -161,6 +209,17 @@ function classifyTranscript(transcript, callType) {
     }
   }
   
+  // Check for complaint/case reference - agent promised to send complaint confirmation
+  for (const keyword of TRIGGER_KEYWORDS.complaint) {
+    if (transcriptLower.includes(keyword)) {
+      return {
+        shouldSend: true,
+        smsType: 'COMPLAINT_SMS',
+        reason: `Matched complaint keyword: "${keyword}"`,
+      };
+    }
+  }
+  
   // Check for summary/confirmation request
   for (const keyword of TRIGGER_KEYWORDS.summary) {
     if (transcriptLower.includes(keyword)) {
@@ -172,7 +231,7 @@ function classifyTranscript(transcript, callType) {
     }
   }
   
-  // Step 3: If OUTBOUND call (and no specific request), send outbound confirmation
+  // Step 3: If OUTBOUND call (and no specific request above), send outbound confirmation
   if (callType === 'OUTBOUND') {
     return {
       shouldSend: true,
@@ -181,42 +240,8 @@ function classifyTranscript(transcript, callType) {
     };
   }
   
-  // Step 4: Check for topic-based keywords (for inbound calls)
-  
-  // Check for complaint-related keywords (high priority for banking)
-  for (const keyword of TRIGGER_KEYWORDS.complaint) {
-    if (transcriptLower.includes(keyword)) {
-      return {
-        shouldSend: true,
-        smsType: 'COMPLAINT_SMS',
-        reason: `Matched complaint keyword: "${keyword}"`,
-      };
-    }
-  }
-  
-  // Check for transaction-related keywords
-  for (const keyword of TRIGGER_KEYWORDS.transaction) {
-    if (transcriptLower.includes(keyword)) {
-      return {
-        shouldSend: true,
-        smsType: 'TRANSACTION_SMS',
-        reason: `Matched transaction keyword: "${keyword}"`,
-      };
-    }
-  }
-  
-  // Check for rewards-related keywords
-  for (const keyword of TRIGGER_KEYWORDS.rewards) {
-    if (transcriptLower.includes(keyword)) {
-      return {
-        shouldSend: true,
-        smsType: 'REWARDS_SMS',
-        reason: `Matched rewards keyword: "${keyword}"`,
-      };
-    }
-  }
-  
-  // Step 4: No match - do not send SMS
+  // Step 4: No specific SMS request detected - do NOT send SMS
+  // We only send SMS when there's an explicit request or the agent promised to send something
   return {
     shouldSend: false,
     smsType: null,
