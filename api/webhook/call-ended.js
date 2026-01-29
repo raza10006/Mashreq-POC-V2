@@ -235,10 +235,23 @@ module.exports = async (req, res) => {
     // ElevenLabs may send data in different structures - try to extract
     const body = req.body || {};
     
-    // Try different possible field names
-    const call_type = body.call_type || body.callType || body.type || body.direction || 'UNKNOWN';
-    const phone_number = body.phone_number || body.phoneNumber || body.to || body.customer_phone || body.from || '';
-    const timestamp = body.timestamp || body.created_at || body.ended_at || new Date().toISOString();
+    // Try different possible field names - ElevenLabs specific fields
+    const call_type = body.call_type || body.callType || body.type || body.direction || 
+                      body.metadata?.call_type || body.data?.call_type || 
+                      body.call?.type || body.call?.direction || 'UNKNOWN';
+    
+    // Phone number - try many possible locations (use let so we can update it)
+    let phone_number = body.phone_number || body.phoneNumber || body.to || body.customer_phone || 
+                       body.from || body.caller || body.callee ||
+                       body.metadata?.phone_number || body.metadata?.to || body.metadata?.from ||
+                       body.data?.phone_number || body.data?.to || body.data?.from ||
+                       body.call?.to || body.call?.from || body.call?.phone_number ||
+                       body.customer?.phone || body.customer?.phone_number ||
+                       body.conversation_initiation_client_data?.dynamic_variables?.customer_phone ||
+                       '';
+    
+    const timestamp = body.timestamp || body.created_at || body.ended_at || 
+                      body.metadata?.timestamp || body.call?.ended_at || new Date().toISOString();
     
     // Transcript might be in different locations and formats
     let transcript = '';
@@ -287,14 +300,53 @@ module.exports = async (req, res) => {
     console.log(`Extracted - Transcript Length: ${transcript.length} chars`);
     console.log(`Extracted - Transcript Preview: ${transcript.substring(0, 500) || 'EMPTY'}...`);
     
-    // Validate required fields
-    if (!phone_number || !transcript) {
-      console.log('Missing required fields (phone_number or transcript)');
-      return res.status(200).json({
-        received: true,
-        sms_sent: false,
-        reason: 'Missing required fields',
-      });
+    // Log all available keys in payload for debugging
+    console.log('Available keys in payload:', Object.keys(body));
+    if (body.data) console.log('Keys in body.data:', Object.keys(body.data));
+    if (body.call) console.log('Keys in body.call:', Object.keys(body.call));
+    if (body.conversation) console.log('Keys in body.conversation:', typeof body.conversation === 'object' ? Object.keys(body.conversation) : 'not object');
+    
+    // Validate required fields - be lenient for debugging
+    if (!transcript) {
+      console.log('WARNING: No transcript found. Checking entire payload for text...');
+      // Last resort: stringify entire payload and search for text
+      const payloadStr = JSON.stringify(body);
+      if (payloadStr.length > 100) {
+        transcript = payloadStr; // Use full payload as transcript for keyword matching
+        console.log('Using full payload as transcript for matching');
+      }
+    }
+    
+    if (!phone_number) {
+      console.log('WARNING: No phone_number found in standard fields');
+      // Try to find phone in nested structures
+      const findPhone = (obj, depth = 0) => {
+        if (depth > 3 || !obj || typeof obj !== 'object') return null;
+        for (const [key, value] of Object.entries(obj)) {
+          if (typeof value === 'string' && value.match(/^\+?[0-9]{10,15}$/)) {
+            console.log(`Found phone-like value in ${key}: ${value}`);
+            return value;
+          }
+          if (typeof value === 'object') {
+            const found = findPhone(value, depth + 1);
+            if (found) return found;
+          }
+        }
+        return null;
+      };
+      const foundPhone = findPhone(body);
+      if (foundPhone) {
+        phone_number = foundPhone; // Actually assign the found phone
+        console.log(`Using found phone: ${phone_number}`);
+      } else {
+        console.log('No phone number found anywhere in payload');
+        return res.status(200).json({
+          received: true,
+          sms_sent: false,
+          reason: 'No phone number found in webhook payload',
+          payload_keys: Object.keys(body),
+        });
+      }
     }
     
     // Classify the transcript
