@@ -14,34 +14,78 @@ const twilio = require('twilio');
 // ============================================================================
 
 const SMS_TEMPLATES = {
-  REWARDS_SMS: "Mashreq Bank: This is a summary of your rewards discussed during today's call. Thank you for banking with us.",
+  // Rewards confirmation
+  REWARDS_SMS: "Mashreq Bank: This confirms your rewards inquiry. Your current balance and transaction details were shared during the call. For questions, call us anytime. Thank you for banking with us.",
   
-  TRANSACTION_SMS: "Mashreq Bank: This is a confirmation regarding the transaction discussed during your recent call.",
+  // Transaction/Transfer confirmation with reference
+  TRANSACTION_SMS: `Mashreq Bank: Transaction Confirmation
+Your funds transfer inquiry has been addressed. 
+Status and reference details were shared during your call.
+If the beneficiary has not received funds within the stated timeline, please contact us.
+Thank you for banking with Mashreq.`,
   
-  COMPLAINT_SMS: "Mashreq Bank: This message confirms the complaint status update shared during your call today.",
+  // Complaint status confirmation
+  COMPLAINT_SMS: "Mashreq Bank: This confirms the complaint status update shared during your call. Your case is being handled as per our service commitment. For further assistance, please call us. Thank you.",
   
-  OUTBOUND_CONFIRMATION_SMS: "Mashreq Bank: This message confirms the update shared during our outbound call today. Thank you.",
+  // Outbound call confirmation
+  OUTBOUND_CONFIRMATION_SMS: "Mashreq Bank: This confirms the update shared during our call today. If you have any questions, please contact us. Thank you for being a valued customer.",
   
+  // Rewards T&C
   REWARDS_TNC_SMS: `Mashreq Bank Rewards T&C Summary:
 • Earn points on qualifying transactions (posted within 48hrs)
-• Redeem for vouchers, cashback, or partner offers
-• Points expire after 24 months
-• Instant redemption available for select partners
-• Points not earned on fees, cash withdrawals, or flagged transactions
-• Account must be active for redemption
+• Redeem for vouchers, cashback, or partner offers (min 500 points)
+• Points expire after 24 months from earning
+• Instant redemption via App/Web for select partners
+• No points on fees, cash withdrawals, or flagged transactions
+• Account must be active & KYC compliant
 Full T&C: mashreqbank.com/rewards-tnc`,
+
+  // SWIFT/Transaction Reference
+  TRANSACTION_REFERENCE_SMS: `Mashreq Bank: Transaction Reference
+Your transaction details and SWIFT reference were shared during your call.
+Please retain this SMS for your records.
+For status updates or assistance, contact Mashreq Bank.
+Thank you.`,
+
+  // Redemption confirmation
+  REDEMPTION_SMS: `Mashreq Bank Rewards: Redemption Confirmation
+Your redemption request details were shared during the call.
+Redemption Rules:
+• Min 500 points required
+• Increments of 100 points
+• Instant redemption is final
+Thank you for using Mashreq Rewards.`,
+
+  // General call summary
+  CALL_SUMMARY_SMS: "Mashreq Bank: Thank you for your call. A summary of your inquiry has been noted. For any further assistance, please contact us. We value your banking relationship.",
 };
 
 // ============================================================================
 // CLASSIFICATION KEYWORDS
 // ============================================================================
 
-// Keywords that TRIGGER SMS sending
+// Keywords that TRIGGER SMS sending (in priority order)
 const TRIGGER_KEYWORDS = {
-  rewards_tnc: ['terms and conditions', 't&c', 'tnc', 'terms & conditions', 'send me the terms', 'send the terms', 'send terms'],
-  rewards: ['reward', 'points', 'redeem', 'redemption', 'loyalty'],
-  transaction: ['transaction', 'transfer', 'payment', 'fund', 'money', 'amount'],
-  complaint: ['complaint', 'case', 'status', 'update', 'issue', 'problem', 'resolved'],
+  // T&C requests - highest priority for specific document request
+  rewards_tnc: ['terms and conditions', 't&c', 'tnc', 'terms & conditions', 'send me the terms', 'send the terms', 'send terms', 't and c', 'terms conditions'],
+  
+  // Transaction reference/SWIFT requests
+  transaction_reference: ['swift', 'reference number', 'transaction reference', 'send reference', 'swift copy', 'send the reference', 'transaction id', 'txn reference'],
+  
+  // Redemption related
+  redemption: ['redeem', 'redemption', 'redeem points', 'how to redeem', 'redemption rules', 'instant redemption'],
+  
+  // Complaint/Case related
+  complaint: ['complaint', 'case', 'case reference', 'complaint status', 'case number', 'escalat', 'issue', 'problem', 'resolved', 'resolution'],
+  
+  // Transaction/Transfer related
+  transaction: ['transaction', 'transfer', 'funds transfer', 'payment', 'beneficiary', 'not received', 'delay', 'pending'],
+  
+  // Rewards balance/points related
+  rewards: ['reward', 'points', 'points balance', 'earned points', 'loyalty', 'points earned'],
+  
+  // General summary request
+  summary: ['send summary', 'call summary', 'send confirmation', 'send details', 'email me', 'sms me'],
 };
 
 // Keywords that BLOCK SMS sending (failed verification, no resolution)
@@ -81,14 +125,49 @@ function classifyTranscript(transcript, callType) {
     }
   }
   
-  // Step 2: Check for T&C request FIRST (specific document request - highest priority)
-  // This takes precedence even for outbound calls if customer requests it
+  // Step 2: Check for specific SMS requests (highest priority)
+  // These take precedence even for outbound calls if customer requests them
+  
+  // Check for T&C request
   for (const keyword of TRIGGER_KEYWORDS.rewards_tnc) {
     if (transcriptLower.includes(keyword)) {
       return {
         shouldSend: true,
         smsType: 'REWARDS_TNC_SMS',
         reason: `Matched T&C request keyword: "${keyword}"`,
+      };
+    }
+  }
+  
+  // Check for transaction reference/SWIFT request
+  for (const keyword of TRIGGER_KEYWORDS.transaction_reference) {
+    if (transcriptLower.includes(keyword)) {
+      return {
+        shouldSend: true,
+        smsType: 'TRANSACTION_REFERENCE_SMS',
+        reason: `Matched transaction reference keyword: "${keyword}"`,
+      };
+    }
+  }
+  
+  // Check for redemption request
+  for (const keyword of TRIGGER_KEYWORDS.redemption) {
+    if (transcriptLower.includes(keyword)) {
+      return {
+        shouldSend: true,
+        smsType: 'REDEMPTION_SMS',
+        reason: `Matched redemption keyword: "${keyword}"`,
+      };
+    }
+  }
+  
+  // Check for summary/confirmation request
+  for (const keyword of TRIGGER_KEYWORDS.summary) {
+    if (transcriptLower.includes(keyword)) {
+      return {
+        shouldSend: true,
+        smsType: 'CALL_SUMMARY_SMS',
+        reason: `Matched summary request keyword: "${keyword}"`,
       };
     }
   }
@@ -102,7 +181,7 @@ function classifyTranscript(transcript, callType) {
     };
   }
   
-  // Step 4: Check for other TRIGGER keywords (in priority order)
+  // Step 4: Check for topic-based keywords (for inbound calls)
   
   // Check for complaint-related keywords (high priority for banking)
   for (const keyword of TRIGGER_KEYWORDS.complaint) {
