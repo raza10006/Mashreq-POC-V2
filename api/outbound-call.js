@@ -68,10 +68,16 @@ module.exports = async (req, res) => {
 
     // Build first message based on language
     const firstName = fullName.split(' ')[0];
-    const isArabic = preferredLanguage.toLowerCase().includes('arabic');
-    const firstMessage = isArabic
-      ? `مرحباً ${firstName}، أنا مساعد ماشرق الذكي. أتصل بك اليوم بخصوص ${callReason}.`
-      : `Hello ${firstName}, this is Mashreq AI Assistant. I'm calling you today regarding ${callReason}.`;
+    const langLower2 = preferredLanguage.toLowerCase();
+    
+    let firstMessage;
+    if (langLower2.includes('arabic')) {
+      firstMessage = `مرحباً ${firstName}، أنا مساعد ماشرق الذكي. أتصل بك اليوم بخصوص ${callReason}.`;
+    } else if (langLower2.includes('hindi')) {
+      firstMessage = `नमस्ते ${firstName}, मैं मशरेक एआई असिस्टेंट हूं। मैं आज आपको ${callReason} के बारे में कॉल कर रहा हूं।`;
+    } else {
+      firstMessage = `Hello ${firstName}, this is Mashreq AI Assistant. I'm calling you today regarding ${callReason}.`;
+    }
 
     // Build conversation initiation data
     const dynamicVars = {
@@ -93,9 +99,10 @@ module.exports = async (req, res) => {
 
     // Determine language code
     let languageCode = 'en';
-    if (preferredLanguage.toLowerCase().includes('arabic')) {
+    const langLower = preferredLanguage.toLowerCase();
+    if (langLower.includes('arabic')) {
       languageCode = 'ar';
-    } else if (preferredLanguage.toLowerCase().includes('hindi')) {
+    } else if (langLower.includes('hindi')) {
       languageCode = 'hi';
     }
 
