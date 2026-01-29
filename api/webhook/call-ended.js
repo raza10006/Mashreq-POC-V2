@@ -240,29 +240,52 @@ module.exports = async (req, res) => {
     const phone_number = body.phone_number || body.phoneNumber || body.to || body.customer_phone || body.from || '';
     const timestamp = body.timestamp || body.created_at || body.ended_at || new Date().toISOString();
     
-    // Transcript might be in different locations
+    // Transcript might be in different locations and formats
     let transcript = '';
-    if (body.transcript) {
-      transcript = typeof body.transcript === 'string' ? body.transcript : JSON.stringify(body.transcript);
-    } else if (body.transcription) {
-      transcript = typeof body.transcription === 'string' ? body.transcription : JSON.stringify(body.transcription);
-    } else if (body.conversation) {
-      transcript = typeof body.conversation === 'string' ? body.conversation : JSON.stringify(body.conversation);
-    } else if (body.messages) {
-      // If messages is an array, concatenate all text
-      transcript = Array.isArray(body.messages) 
-        ? body.messages.map(m => m.text || m.content || m.message || '').join(' ')
-        : JSON.stringify(body.messages);
-    } else if (body.data?.transcript) {
-      transcript = body.data.transcript;
-    } else if (body.analysis?.transcript) {
-      transcript = body.analysis.transcript;
-    }
+    
+    // Helper function to extract text from transcript
+    const extractTranscriptText = (data) => {
+      if (!data) return '';
+      if (typeof data === 'string') return data;
+      if (Array.isArray(data)) {
+        return data.map(item => {
+          if (typeof item === 'string') return item;
+          if (item.text) return item.text;
+          if (item.content) return item.content;
+          if (item.message) return item.message;
+          if (item.transcript) return item.transcript;
+          if (item.role && item.message) return `${item.role}: ${item.message}`;
+          return JSON.stringify(item);
+        }).join(' ');
+      }
+      if (typeof data === 'object') {
+        // Try common nested structures
+        if (data.text) return data.text;
+        if (data.content) return data.content;
+        if (data.full_transcript) return data.full_transcript;
+        if (data.messages) return extractTranscriptText(data.messages);
+        return JSON.stringify(data);
+      }
+      return String(data);
+    };
+    
+    // Try different possible field names for transcript
+    transcript = extractTranscriptText(body.transcript) ||
+                 extractTranscriptText(body.transcription) ||
+                 extractTranscriptText(body.conversation) ||
+                 extractTranscriptText(body.messages) ||
+                 extractTranscriptText(body.data?.transcript) ||
+                 extractTranscriptText(body.analysis?.transcript) ||
+                 extractTranscriptText(body.call?.transcript) ||
+                 '';
+    
+    // Ensure transcript is a string
+    transcript = String(transcript || '');
     
     console.log(`Extracted - Call Type: ${call_type}`);
     console.log(`Extracted - Phone: ${phone_number}`);
-    console.log(`Extracted - Transcript Length: ${transcript?.length || 0} chars`);
-    console.log(`Extracted - Transcript Preview: ${transcript?.substring(0, 200) || 'EMPTY'}...`);
+    console.log(`Extracted - Transcript Length: ${transcript.length} chars`);
+    console.log(`Extracted - Transcript Preview: ${transcript.substring(0, 500) || 'EMPTY'}...`);
     
     // Validate required fields
     if (!phone_number || !transcript) {
