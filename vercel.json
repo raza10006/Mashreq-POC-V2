@@ -12,6 +12,10 @@
   ],
   "routes": [
     {
+      "src": "/api/health",
+      "dest": "/api/health.js"
+    },
+    {
       "src": "/api/outbound-call",
       "methods": ["POST", "OPTIONS"],
       "dest": "/api/outbound-call.js"
