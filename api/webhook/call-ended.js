@@ -81,18 +81,8 @@ function classifyTranscript(transcript, callType) {
     }
   }
   
-  // Step 2: If OUTBOUND call, send outbound confirmation
-  if (callType === 'OUTBOUND') {
-    return {
-      shouldSend: true,
-      smsType: 'OUTBOUND_CONFIRMATION_SMS',
-      reason: 'Outbound call completed',
-    };
-  }
-  
-  // Step 3: Check for TRIGGER keywords (in priority order)
-  
-  // Check for T&C request first (specific document request - highest priority)
+  // Step 2: Check for T&C request FIRST (specific document request - highest priority)
+  // This takes precedence even for outbound calls if customer requests it
   for (const keyword of TRIGGER_KEYWORDS.rewards_tnc) {
     if (transcriptLower.includes(keyword)) {
       return {
@@ -102,6 +92,17 @@ function classifyTranscript(transcript, callType) {
       };
     }
   }
+  
+  // Step 3: If OUTBOUND call (and no specific request), send outbound confirmation
+  if (callType === 'OUTBOUND') {
+    return {
+      shouldSend: true,
+      smsType: 'OUTBOUND_CONFIRMATION_SMS',
+      reason: 'Outbound call completed',
+    };
+  }
+  
+  // Step 4: Check for other TRIGGER keywords (in priority order)
   
   // Check for complaint-related keywords (high priority for banking)
   for (const keyword of TRIGGER_KEYWORDS.complaint) {

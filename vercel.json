@@ -26,6 +26,10 @@
       "dest": "/api/webhook/call-ended.js"
     },
     {
+      "src": "/api/test-sms",
+      "dest": "/api/test-sms.js"
+    },
+    {
       "src": "/(.*)",
       "dest": "/public/$1"
     }
