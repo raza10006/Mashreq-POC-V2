@@ -81,6 +81,7 @@ module.exports = async (req, res) => {
       call_type: 'OUTBOUND',
       call_reason: callReason,
       outbound_context: JSON.stringify(outboundContext),
+      suggested_greeting: firstMessage,
     };
 
     // Add context data as dynamic variables
@@ -99,7 +100,6 @@ module.exports = async (req, res) => {
         conversation_config_override: {
           agent: {
             first_message: firstMessage,
-            language: isArabic ? 'ar' : 'en',
           },
         },
       },
