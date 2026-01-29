@@ -21,6 +21,15 @@ const SMS_TEMPLATES = {
   COMPLAINT_SMS: "Mashreq Bank: This message confirms the complaint status update shared during your call today.",
   
   OUTBOUND_CONFIRMATION_SMS: "Mashreq Bank: This message confirms the update shared during our outbound call today. Thank you.",
+  
+  REWARDS_TNC_SMS: `Mashreq Bank Rewards T&C Summary:
+• Earn points on qualifying transactions (posted within 48hrs)
+• Redeem for vouchers, cashback, or partner offers
+• Points expire after 24 months
+• Instant redemption available for select partners
+• Points not earned on fees, cash withdrawals, or flagged transactions
+• Account must be active for redemption
+Full T&C: mashreqbank.com/rewards-tnc`,
 };
 
 // ============================================================================
@@ -29,6 +38,7 @@ const SMS_TEMPLATES = {
 
 // Keywords that TRIGGER SMS sending
 const TRIGGER_KEYWORDS = {
+  rewards_tnc: ['terms and conditions', 't&c', 'tnc', 'terms & conditions', 'send me the terms', 'send the terms', 'send terms'],
   rewards: ['reward', 'points', 'redeem', 'redemption', 'loyalty'],
   transaction: ['transaction', 'transfer', 'payment', 'fund', 'money', 'amount'],
   complaint: ['complaint', 'case', 'status', 'update', 'issue', 'problem', 'resolved'],
@@ -82,7 +92,18 @@ function classifyTranscript(transcript, callType) {
   
   // Step 3: Check for TRIGGER keywords (in priority order)
   
-  // Check for complaint-related keywords first (highest priority for banking)
+  // Check for T&C request first (specific document request - highest priority)
+  for (const keyword of TRIGGER_KEYWORDS.rewards_tnc) {
+    if (transcriptLower.includes(keyword)) {
+      return {
+        shouldSend: true,
+        smsType: 'REWARDS_TNC_SMS',
+        reason: `Matched T&C request keyword: "${keyword}"`,
+      };
+    }
+  }
+  
+  // Check for complaint-related keywords (high priority for banking)
   for (const keyword of TRIGGER_KEYWORDS.complaint) {
     if (transcriptLower.includes(keyword)) {
       return {
