@@ -78,12 +78,19 @@ const TRIGGER_KEYWORDS = {
     'send t&c via sms',
     'send tnc via sms',
     'terms and conditions via sms',
+    'terms and conditions by sms',
     't&c via sms',
+    't&c by sms',
+    'tnc by sms',
+    'tnc via sms',
     'send me terms via sms',
+    'send me terms by sms',
     'can you send the terms',
     'can you send me the terms',
-    'send rules via sms',
-    'send the rules',
+    'send the t and c',
+    'send me the t and c',
+    't and c by sms',
+    't and c via sms',
   ],
   
   // Transaction reference/SWIFT requests - explicit send request
@@ -100,13 +107,23 @@ const TRIGGER_KEYWORDS = {
     'send me the transaction details',
   ],
   
-  // Redemption rules request - explicit send request
+  // Redemption rules request - customer asks to send redemption info
   redemption: [
     'send redemption rules',
     'send me the redemption',
     'send redemption via sms',
-    'how to redeem via sms',
     'redemption rules via sms',
+    'redemption rules by sms',
+    'redemption by sms',
+    'redeem by sms',
+    'send me the rewards redemption',
+    'rewards redemption rules by sms',
+    'rewards redemption by sms',
+    'how to redeem by sms',
+    'how to redeem via sms',
+    'send me the redemption rules',
+    'can you send me the redemption',
+    'can you send redemption',
   ],
   
   // Complaint/Case confirmation - when agent promises to send complaint confirmation
