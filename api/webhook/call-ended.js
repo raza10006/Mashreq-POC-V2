@@ -67,80 +67,66 @@ Thank you for using Mashreq Rewards.`,
 // Keywords that TRIGGER SMS sending (in priority order)
 // IMPORTANT: These must detect REQUESTS to send SMS, not just mentions of topics
 const TRIGGER_KEYWORDS = {
-  // T&C requests - must be explicit request to SEND T&C
+  // T&C requests - customer asks to send terms and conditions
   rewards_tnc: [
-    'send me the terms and conditions',
-    'send the terms and conditions',
-    'send me the t&c',
-    'send the t&c',
-    'send me the tnc',
-    'send the tnc',
-    'send t&c via sms',
-    'send tnc via sms',
-    'terms and conditions via sms',
+    'send terms and conditions',
+    'send the terms',
+    'send me the terms',
+    'send t&c',
+    'send tnc',
+    'send t and c',
     'terms and conditions by sms',
-    't&c via sms',
+    'terms and conditions via sms',
+    'terms by sms',
+    'terms via sms',
     't&c by sms',
+    't&c via sms',
     'tnc by sms',
     'tnc via sms',
-    'send me terms via sms',
-    'send me terms by sms',
-    'can you send the terms',
-    'can you send me the terms',
-    'send the t and c',
-    'send me the t and c',
-    't and c by sms',
-    't and c via sms',
   ],
   
-  // Transaction reference/SWIFT requests - explicit send request
+  // Transaction reference/SWIFT requests - customer asks for transaction details
   transaction_reference: [
     'send swift',
     'send the swift',
-    'send me the swift',
     'send reference number',
-    'send the reference number',
-    'send me the reference',
-    'send transaction reference',
+    'send the reference',
+    'send transaction',
+    'swift by sms',
     'swift via sms',
+    'reference by sms',
     'reference via sms',
-    'send me the transaction details',
+    'transaction details by sms',
+    'transaction details via sms',
   ],
   
   // Redemption rules request - customer asks to send redemption info
   redemption: [
-    'send redemption rules',
+    'send redemption',
+    'send me redemption',
+    'send the redemption',
     'send me the redemption',
-    'send redemption via sms',
-    'redemption rules via sms',
-    'redemption rules by sms',
+    'redemption rules',
     'redemption by sms',
+    'redemption via sms',
     'redeem by sms',
-    'send me the rewards redemption',
-    'rewards redemption rules by sms',
-    'rewards redemption by sms',
-    'how to redeem by sms',
-    'how to redeem via sms',
-    'send me the redemption rules',
-    'can you send me the redemption',
-    'can you send redemption',
+    'redeem via sms',
+    'rewards redemption',
+    'how to redeem',
   ],
   
   // Complaint/Case confirmation - when agent promises to send complaint confirmation
-  // This detects agent saying they will send SMS about complaint
   complaint: [
-    'send you a confirmation with the case reference',
-    'send confirmation with case reference',
-    'case reference via sms',
-    'complaint reference via sms',
-    'send you the case reference',
-    'send case reference',
+    'case reference',
+    'complaint reference',
     'initiated a complaint',
     'raise a complaint',
     'raised a complaint',
     'complaint to investigate',
-    'i\'ve initiated a complaint',
-    'i have initiated a complaint',
+    'log a complaint',
+    'logged a complaint',
+    'complaint confirmation',
+    'complaint status',
   ],
   
   // General summary/confirmation request
@@ -178,6 +164,10 @@ const BLOCK_KEYWORDS = [
  */
 function classifyTranscript(transcript, callType) {
   const transcriptLower = transcript.toLowerCase();
+  
+  // DEBUG: Log a snippet of the transcript for debugging
+  console.log('Classifying transcript (first 500 chars):', transcriptLower.substring(0, 500));
+  console.log('Call type:', callType);
   
   // Step 1: Check for BLOCK keywords - if found, do NOT send SMS
   for (const blockKeyword of BLOCK_KEYWORDS) {
