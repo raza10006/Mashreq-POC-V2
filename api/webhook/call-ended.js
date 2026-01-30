@@ -351,46 +351,62 @@ module.exports = async (req, res) => {
                       body.metadata?.call_type || body.data?.call_type || 
                       body.call?.type || body.call?.direction || 'UNKNOWN';
     
-    // Phone number - try many possible locations (use let so we can update it)
+    // Phone number extraction - CRITICAL for SMS
     // For OUTBOUND calls: customer is "to", agent is "from"
     // For INBOUND calls: customer is "from", agent is "to"
-    // Prioritize "to" for outbound, exclude the Twilio number
-    const twilioNumber = process.env.TWILIO_FROM_NUMBER || '+15856678990';
     
-    // Get all possible phone fields
-    const possiblePhones = [
-      body.to,
-      body.customer_phone,
-      body.phone_number,
-      body.phoneNumber,
-      body.callee,
-      body.metadata?.to,
-      body.metadata?.phone_number,
-      body.data?.to,
-      body.data?.phone_number,
-      body.call?.to,
-      body.call?.customer_phone,
-      body.customer?.phone,
-      body.customer?.phone_number,
-      body.conversation_initiation_client_data?.dynamic_variables?.customer_phone,
-      // Only use "from" as last resort (for inbound calls)
-      body.from,
-      body.caller,
-      body.metadata?.from,
-      body.data?.from,
-      body.call?.from,
-    ].filter(Boolean);
+    // ElevenLabs phone number (the agent's number - NOT the customer)
+    const elevenLabsNumber = '+15856678990';
+    const twilioNumber = process.env.TWILIO_FROM_NUMBER || elevenLabsNumber;
     
-    // Find first phone that's NOT the Twilio number
-    let phone_number = possiblePhones.find(p => {
-      const normalized = p.replace(/\s/g, '');
-      const twilioNormalized = twilioNumber.replace(/\s/g, '');
-      return normalized !== twilioNormalized && !normalized.includes('158566');
-    }) || '';
+    // Log ALL phone-related fields for debugging
+    console.log('=== PHONE EXTRACTION DEBUG ===');
+    console.log('body.to:', body.to);
+    console.log('body.from:', body.from);
+    console.log('body.phone_number:', body.phone_number);
+    console.log('body.customer_phone:', body.customer_phone);
+    console.log('body.call?.to:', body.call?.to);
+    console.log('body.call?.from:', body.call?.from);
+    console.log('body.call?.customer_number:', body.call?.customer_number);
+    console.log('body.metadata?.to:', body.metadata?.to);
+    console.log('body.metadata?.from:', body.metadata?.from);
+    console.log('body.analysis?.call_to:', body.analysis?.call_to);
+    console.log('body.conversation_initiation_client_data:', JSON.stringify(body.conversation_initiation_client_data));
+    console.log('=== END PHONE DEBUG ===');
     
-    console.log('Possible phones found:', possiblePhones);
-    console.log('Twilio number to exclude:', twilioNumber);
+    // Collect all phone-like strings from the payload
+    const allPhones = [];
+    const collectPhones = (obj, path = '') => {
+      if (!obj || typeof obj !== 'object') return;
+      for (const [key, value] of Object.entries(obj)) {
+        const currentPath = path ? `${path}.${key}` : key;
+        if (typeof value === 'string') {
+          // Match phone number patterns
+          if (value.match(/^\+?[0-9\s\-]{10,20}$/)) {
+            const normalized = value.replace(/[\s\-]/g, '');
+            allPhones.push({ path: currentPath, value: normalized, original: value });
+          }
+        } else if (typeof value === 'object' && value !== null) {
+          collectPhones(value, currentPath);
+        }
+      }
+    };
+    collectPhones(body);
+    console.log('All phone numbers found in payload:', allPhones);
+    
+    // Filter out the ElevenLabs/Twilio agent number to get customer's number
+    const customerPhones = allPhones.filter(p => {
+      const num = p.value.replace(/\+/g, '');
+      const agentNum = elevenLabsNumber.replace(/[\+\s\-]/g, '');
+      return !num.includes('15856678990') && num !== agentNum;
+    });
+    console.log('Customer phones (excluding agent):', customerPhones);
+    
+    // Select the customer phone
+    let phone_number = customerPhones.length > 0 ? customerPhones[0].value : '';
+    
     console.log('Selected customer phone:', phone_number);
+    console.log('Twilio FROM number:', twilioNumber);
     
     const timestamp = body.timestamp || body.created_at || body.ended_at || 
                       body.metadata?.timestamp || body.call?.ended_at || new Date().toISOString();
@@ -503,6 +519,28 @@ module.exports = async (req, res) => {
         received: true,
         sms_sent: false,
         reason: classification.reason,
+      });
+    }
+    
+    // Validate phone number is not the same as FROM number
+    const fromNumber = process.env.TWILIO_FROM_NUMBER || '';
+    const normalizedTo = phone_number.replace(/[\+\s\-]/g, '');
+    const normalizedFrom = fromNumber.replace(/[\+\s\-]/g, '');
+    
+    if (normalizedTo === normalizedFrom || normalizedTo.includes('15856678990')) {
+      console.error('CRITICAL: Customer phone matches agent phone - cannot send SMS');
+      console.error('This means we failed to extract the customer phone from the webhook');
+      console.error('Full payload keys:', Object.keys(body));
+      console.error('Full payload:', JSON.stringify(body).substring(0, 2000));
+      return res.status(200).json({
+        received: true,
+        sms_sent: false,
+        reason: 'Customer phone not found in webhook - matches agent phone',
+        debug: {
+          extracted_phone: phone_number,
+          twilio_from: fromNumber,
+          payload_keys: Object.keys(body),
+        },
       });
     }
     
